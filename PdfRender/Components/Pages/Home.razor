@@ -1,0 +1,78 @@
+﻿@page "/"
+
+@using UglyToad.PdfPig;
+@using UglyToad.PdfPig.Graphics.Colors;
+@using UglyToad.PdfPig.Rendering.Skia;
+
+<div class="my-5 text-center">
+    <button type="button" class="btn btn-success" @onclick="OpenAsync">
+        Browse, open and process PDF file...
+    </button>
+</div>
+<div class="d-flex">
+    <div class="w-50">
+        @metadata
+    </div>
+    <div class="w-50">
+        @if (image != null)
+        {
+            <img class="img-thumbnail shadow-sm" src="data:image/png;base64,@image" alt="1st PDF Page" />
+        }
+    </div>
+</div>
+
+@if (error != null)
+{
+    <div class="alert alert-danger mt-5" role="alert">
+        <strong>Error:</strong> @error
+    </div>
+}
+
+
+
+@code {
+    string? metadata;
+    string? image;
+    string? error;
+
+
+    private async Task OpenAsync()
+    {
+        metadata = image = null;
+        var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                FileTypes = new FilePickerFileType(
+                                new Dictionary<DevicePlatform, IEnumerable<string>>() {
+                                    { DevicePlatform.WinUI, new List<string>() { "*.pdf" } },
+                                    { DevicePlatform.MacCatalyst, new List<string>() { "pdf" } },
+                                    { DevicePlatform.macOS, new List<string>() { "pdf" } }
+                                }
+                            )
+            });
+
+        if (result != null)
+        {
+            ProcessPdf(result.FullPath);
+        }
+    }
+
+    private void ProcessPdf(string filePath)
+    {
+        metadata = image = error = null;
+
+        try
+        {
+            using var document = PdfDocument.Open(filePath);
+            document.AddSkiaPageFactory();
+
+            metadata = $"Title: {document.Information.Title}, Author: {document.Information.Author}, Creator: {document.Information.Creator}, Creation date: {document.Information.CreationDate}";
+
+            using var stream = document.GetPageAsPng(1);
+            image = Convert.ToBase64String(stream.ToArray());
+        }
+        catch (Exception ex)
+        {
+            error = ex.StackTrace;
+        }
+    }
+}
